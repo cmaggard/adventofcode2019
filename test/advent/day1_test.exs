@@ -18,8 +18,8 @@ defmodule Advent.Day1Test do
   end
 
   test "recursive fuel count should work" do
-    assert Day1.do_day1_2({0, 14}) == 2
-    assert Day1.do_day1_2({0, 1969}) == 966
-    assert Day1.do_day1_2({0, 100756}) == 50346
+    assert Day1.calculate_recursive_fuel_for_mass(14) == 2
+    assert Day1.calculate_recursive_fuel_for_mass(1969) == 966
+    assert Day1.calculate_recursive_fuel_for_mass(100756) == 50346
   end
 end

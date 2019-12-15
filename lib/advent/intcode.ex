@@ -1,5 +1,5 @@
 defmodule Advent.Intcode do
-  def execute(program, debug \\ true) do
+  def execute(program, debug \\ false) do
     debugger = case debug do
       true -> &__MODULE__.log/1
       false -> &__MODULE__.noop/1
@@ -75,14 +75,13 @@ defmodule Advent.Intcode do
   def patch(program, []), do: program
 
   def patch(program, [{at, val} | patches]) do
-    new_program = program 
+    program
     |> List.replace_at(at, val)
     |> patch(patches)
   end
 
-  def noop(text), do: nil
+  def noop(_), do: nil
 
   def log(text) when is_binary(text), do: IO.puts("  #{text}")
-
   def log(other), do: IO.inspect(other)
 end
