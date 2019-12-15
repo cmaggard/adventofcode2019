@@ -1,12 +1,22 @@
 defmodule Advent.Intcode do
   alias Advent.Intcode.State
 
-  def execute(program, debug \\ false) do
+  def execute(program, debug) when is_list(program) do
     State.new(program, debug)
     |> do_execute()
   end
 
+  def execute(program) when is_list(program) do
+    State.new(program, false)
+    |> do_execute()
+  end
+
+  def execute(state) do
+    do_execute(state)
+  end
+
   def do_execute(state = %State{program: program, pc: pc, debug: debug}) do
+    instruction = State.get_instruction(state)
     instruction = Enum.at(program, pc)
     modes = div(instruction, 100)
     opcode = rem(instruction, 100)

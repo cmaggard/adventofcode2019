@@ -1,10 +1,12 @@
 defmodule Advent.Day2 do
   alias Advent.Intcode
+  alias Advent.Intcode.State
+
   def day2_1 do
-    result = program()
-             |> Intcode.patch([{1, 12}, {2, 2}])
+    result = State.new(program())
+             |> State.patch([{1, 12}, {2, 2}])
              |> Intcode.execute()
-             |> Enum.at(0)
+             |> State.get_memory_value(0)
     IO.puts "Value at location 0 is #{result}"
   end
 
@@ -14,10 +16,10 @@ defmodule Advent.Day2 do
 
   def do_day2_2(program, a, 100), do: do_day2_2(program, a+1, 0)
   def do_day2_2(program, a, b) do
-    val = program
-          |> Intcode.patch([{1, a}, {2, b}])
+    val = State.new(program())
+          |> State.patch([{1, a}, {2, b}])
           |> Intcode.execute()
-          |> Enum.at(0)
+          |> State.get_memory_value(0)
     case val do
       19690720 ->
         result = a * 100 + b
