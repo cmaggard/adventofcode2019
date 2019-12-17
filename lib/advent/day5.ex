@@ -1,14 +1,14 @@
 defmodule Advent.Day5 do
   alias Advent.Intcode
 
-  def day5_1 do
+  def day5 do
     program()
     |> Intcode.execute(false)
   end
 
-  def day5_1_debug do
+  def day5_debug do
     program()
-    |> Intcode.execute()
+    |> Intcode.execute(true)
   end
 
   def program do

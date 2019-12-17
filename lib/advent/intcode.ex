@@ -1,5 +1,6 @@
 defmodule Advent.Intcode do
   alias Advent.Intcode.State
+  alias Advent.Intcode.Instruction
 
   def execute(program, debug) when is_list(program) do
     State.new(program, debug)
@@ -15,76 +16,139 @@ defmodule Advent.Intcode do
     do_execute(state)
   end
 
-  def do_execute(state = %State{program: program, pc: pc, debug: debug}) do
+  def do_execute(state) do
     instruction = State.get_instruction(state)
-    instruction = Enum.at(program, pc)
-    modes = div(instruction, 100)
-    opcode = rem(instruction, 100)
-    debug.("  Program Counter: #{pc}")
-    debug.("    I: #{instruction} O: #{opcode} M: #{modes}")
     cond do
-      opcode == 99 ->
+      instruction.opcode == 99 ->
         state
-      opcode == 3 ->
-        dest = Enum.at(program, pc+1)
-        new_state = eval_opcode(state, modes, opcode, dest)
-        %{new_state | pc: pc + 2}
-        |> do_execute()
-      opcode == 4 ->
-        dest = get_value(state, rem(modes, 10), Enum.at(program, pc+1))
-        new_state = eval_opcode(state, modes, opcode, dest)
-        %{new_state | pc: pc + 2}
-        |> do_execute()
-      opcode in [1,2,3] ->
-        larg = get_value(state, rem(modes, 10), Enum.at(program, pc+1))
-        rarg = get_value(state, div(modes, 10), Enum.at(program, pc+2))
-        dest = Enum.at(program, pc+3)
-        new_state = eval_opcode(state, modes, opcode, larg, rarg, dest)
-        %{new_state | pc: pc + 4}
+      instruction.opcode in 1..8 ->
+        state
+        |> eval_instruction(instruction)
         |> do_execute()
       true ->
-        IO.puts "PROGRAM ERROR: OPCODE #{opcode} ENCOUNTERED"
+        IO.puts "PROGRAM ERROR: OPCODE #{instruction.opcode} ENCOUNTERED"
         IO.puts "HALTING."
+        state
     end
   end
 
-  def eval_opcode(state, _modes, 1, lval, rval, dest) do
+  # Add two values
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 1 do
+    dest = Instruction.dest_val(state, instruction)
+    lval = Instruction.first_val(state, instruction)
+    rval = Instruction.second_val(state, instruction)
+
     state.debug.("Add #{lval} and #{rval}, store in #{dest}")
-    State.patch(state, [{dest, lval + rval}])
+
+    state
+    |> State.patch([{dest, lval + rval}])
+    |> State.set_pc(state.pc + 4)
   end
 
-  def eval_opcode(state, _modes, 2, lval, rval, dest) do
+  # Multiply two values
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 2 do
+    dest = Instruction.dest_val(state, instruction)
+    lval = Instruction.first_val(state, instruction)
+    rval = Instruction.second_val(state, instruction)
+
     state.debug.("Multiply #{lval} and #{rval}, store in #{dest}")
-    State.patch(state, [{dest, lval * rval}])
+
+    state
+    |> State.patch([{dest, lval * rval}])
+    |> State.set_pc(state.pc + 4)
   end
 
-  def eval_opcode(state, _modes, 3, dest) do
+  # Input value, store to location
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 3 do
+    dest = Instruction.dest_val(state, instruction)
+
     val = IO.gets("Intcode input> ")
           |> String.replace("\n", "")
           |> String.to_integer()
+
     state.debug.("Store #{val} at #{dest}")
-    State.patch(state, [{dest, val}])
-  end
 
-  def eval_opcode(state, _modes, 4, val) do
-    state.debug.("Read #{val}")
-    IO.puts "Intcode output: #{val}"
     state
+    |> State.patch([{dest, val}])
+    |> State.set_pc(state.pc + 2)
   end
 
-  def get_value(state, _imm = 0, val) do
-    newval = Enum.at(state.program, val)
-    state.debug.("  Get value at #{val} (#{newval})")
-    newval
+  # Output value of location
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 4 do
+    dest = Instruction.moded_dest_val(state, instruction)
+    IO.puts "Intcode output: #{dest}"
+
+    state
+    |> State.set_pc(state.pc + 2)
   end
 
-  def get_value(_program, _imm = 1, val, debug) do
-    debug.("  Literal value #{val}")
-    val
+  # Jump if true
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 5 do
+    dest = Instruction.moded_dest_val(state, instruction)
+    lval = Instruction.first_val(state, instruction)
+
+    state.debug.("Jump-if-true on #{lval} to #{dest}")
+
+    if lval != 0 do
+      state
+      |> State.set_pc(dest)
+    else
+      state
+      |> State.set_pc(state.pc + 3)
+    end
   end
 
-  def noop(_), do: nil
+  # Jump if false
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 6 do
+    dest = Instruction.moded_dest_val(state, instruction)
+    lval = Instruction.first_val(state, instruction)
 
-  def log(text) when is_binary(text), do: IO.puts("  #{text}")
-  def log(other), do: IO.inspect(other)
+    state.debug.("Jump-if-false on #{lval} to #{dest}")
+
+    if lval == 0 do
+      state
+      |> State.set_pc(dest)
+    else
+      state
+      |> State.set_pc(state.pc + 3)
+    end
+  end
+
+  # Less than
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 7 do
+    dest = Instruction.dest_val(state, instruction)
+    lval = Instruction.first_val(state, instruction)
+    rval = Instruction.second_val(state, instruction)
+
+    store = if lval < rval do
+      1
+    else
+      0
+    end
+
+    state.debug.("Testing #{lval} < #{rval}, storing #{store} to #{dest}")
+
+    state
+    |> State.patch([{dest, store}])
+    |> State.set_pc(state.pc + 4)
+  end
+
+  # Equals
+  def eval_instruction(state, instruction = %{opcode: opcode}) when opcode == 8 do
+    dest = Instruction.dest_val(state, instruction)
+    lval = Instruction.first_val(state, instruction)
+    rval = Instruction.second_val(state, instruction)
+
+    store = if lval == rval do
+      1
+    else
+      0
+    end
+
+    state.debug.("Testing #{lval} = #{rval}, storing #{store} to #{dest}")
+
+    state
+    |> State.patch([{dest, store}])
+    |> State.set_pc(state.pc + 4)
+  end
 end

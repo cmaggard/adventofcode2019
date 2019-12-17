@@ -14,7 +14,9 @@ defmodule Advent.Intcode.State do
   end
 
   def get_instruction(state = %__MODULE__{program: program, pc: pc}) do
+    state.debug.(state)
     inst_num = Enum.at(program, pc)
+    state.debug.("Operation #{inst_num}")
     opcode = rem(inst_num, 100)
     modes = div(inst_num, 100)
     first_mode = rem(modes, 10)
@@ -22,19 +24,31 @@ defmodule Advent.Intcode.State do
     third_mode = div(modes, 100)
     instruction = %Instruction{opcode: opcode}
     cond do
+      # Halt opcode
       opcode == 99 ->
         instruction
-      opcode in [1,2,5,6,7,8] ->
+
+      # One-parameter opcodes
+      opcode in [3, 4] ->
+        %{instruction | opcode: opcode,
+          dest_val: Enum.at(program, pc + 1),
+          dest_mode: first_mode}
+
+      # Two-parameter opcodes
+      opcode in [5, 6] ->
+        %{instruction | left_val: Enum.at(program, pc + 1),
+          dest_val: Enum.at(program, pc + 2),
+          left_mode: first_mode,
+          dest_mode: second_mode}
+
+      # Three-parameter opcodes
+      opcode in [1, 2, 7, 8] ->
         %{instruction | left_val: Enum.at(program, pc + 1),
           right_val: Enum.at(program, pc + 2),
           dest_val: Enum.at(program, pc + 3),
           left_mode: first_mode,
           right_mode: second_mode,
           dest_mode: third_mode}
-      opcode in [3, 4] ->
-        %{instruction | opcode: opcode,
-          dest_val: Enum.at(program, pc + 1),
-          dest_mode: first_mode}
     end
   end
 
@@ -52,6 +66,8 @@ defmodule Advent.Intcode.State do
     state.debug.(new_state)
     new_state |> patch(patches)
   end
+
+  def set_pc(state, pc), do: %{state | pc: pc}
 
   def get_memory_value(state, loc), do: Enum.at(state.program, loc)
 
